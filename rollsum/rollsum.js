@@ -1,64 +1,50 @@
-
 const { fstat, open, read } = require('fs')
 const assert = require('assert')
 const { promisify } = require('util')
+const Module = require('./roller')
+const _rollSum3 = Module._rollsum
+const _rollSum2 = Module.cwrap('rollsum', 'number', ['array', 'number'])
 
 const fstatAsync = promisify(fstat)
 const openAsync = promisify(open)
 const readAsync = promisify(read)
 
-async function run(fn) {
-	const b = new Buffer(2048)
-	const fd = await openAsync(fn, 'r')
-	const stat = await fstatAsync(fd)
-	let { size } = stat
-	let off = 0
-	let check = 0
-	while (size) {
-		const chunk = await readAsync(fd, b, 0, 2048, off)
-		if (chunk.bytesRead < 2048) {
-			check = rollSum1(b.slice(0, chunk.bytesRead))
-		} else {
-			check = rollSum1(b)		
-		}
-		console.log(check)
-		off += chunk.bytesRead
-		size -= chunk.bytesRead
-	}
+function rollSum3(b) {
+	const len = b.length
+	const bb = Module._malloc(len);
+	Module.HEAPU8.set(b, bb);
+	const r = _rollSum3(bb, len) >>> 0
+	Module._free(bb);
+	return r
 }
 
-async function stress1(fn, fun, runs = 100000) {
-	const buffers = []
-	const fd = await openAsync(fn, 'r')
-	const stat = await fstatAsync(fd)
-	let { size } = stat
-	let off = 0
-	let check = 0
-	while (size) {
-		const b = new Buffer(2048)
-		const chunk = await readAsync(fd, b, 0, 2048, off)
-		if (chunk.bytesRead < 2048) {
-			buffers.push(b.slice(0, chunk.bytesRead))
-		} else {
-			buffers.push(b)
-		}
-		off += chunk.bytesRead
-		size -= chunk.bytesRead
-	}
-	const start = Date.now()
-	let blen = buffers.length
-	let total = 0
-	while (runs--) {
-		let i = 0
-		while (i < blen) {
-			total += fun(buffers[i++])		
-		}
-	}
-	console.log(total)
-	console.log(Date.now() - start)
+function rollSum2(b) {
+	return _rollSum2(b, b.length) >>> 0
 }
 
-async function stress2(fn, fun, runs = 100000) {
+function rollSum1(data) {
+	let A = 0
+	let B = 0
+	const len = data.length;
+	for (let i = 0; i < len; i++) {
+		A += data[i] + 31
+		B += A
+	}
+	const v1 = (A & 0xffff)
+	const v2 = ((B & 0xffff) * 65536)
+	return v1 + v2 >>> 0
+}
+
+/*
+100000 runs, 4 buffers
+python 57 seconds
+rollsum1 = 1.6 seconds
+rollsum2 = 2 seconds
+rollsum3 0.9 seconds
+c 0.7 seconds
+*/
+
+async function stress(fn, fun, runs = 100000) {
 	const fd = await openAsync(fn, 'r')
 	const stat = await fstatAsync(fd)
 	const b1 = new Buffer(2048)
@@ -79,41 +65,4 @@ async function stress2(fn, fun, runs = 100000) {
 	console.log(Date.now() - start)
 }
 
-function rollSum1(data) {
-	let A = 0;
-	let B = 0;
-	const len = data.length;
-	for (let i = 0; i < len; i++) {
-		A += data[i] + 31;
-		B += A;
-	}
-	const v1 = (A & 0xffff)
-	const v2 = ((B & 0xffff) * 65536)
-	return v1 + v2;
-}
-
-function rollSum2(data) {
-	let A = 0;
-	let B = 0;
-	data.forEach(b => {
-		A += b + 31;
-		B += A;
-	});
-	const v1 = (A & 0xffff)
-	const v2 = ((B & 0xffff) * 65536)
-	return v1 + v2;
-}
-
-/*
-100000 runs, 4 buffers
-
-python 57 seconds
-stress1/rollsum2 = 16.8 seconds
-stress2/rollsum2 = 16.3 seconds
-stress1/rollsum1 = 1.7 seconds
-stress2/rollsum1 = 1.5 seconds
-c 0.7 seconds
-asm.js 0.7 seconds (wrong results!)
-*/
-
-stress2('./small.pdf', rollSum1).catch(err => console.error(err))
+stress('./small.pdf', rollSum3).catch(err => console.error(err))

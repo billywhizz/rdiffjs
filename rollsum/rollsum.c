@@ -20,7 +20,7 @@ uint32_t rollsum(uint8_t* b, uint32_t len) {
 		B += A;
 		b++;
 	}
-	return (A & 0xffff) + ((B & 0xffff) *65536);
+	return (A & 0xffff) + ((B & 0xffff) * 65536);
 }
 
 int main() {
@@ -43,5 +43,5 @@ int main() {
 		assert(rollsum(b4, 1801) == 3918749721);
 	}
 	gettimeofday(&stop, NULL);
-	printf("took %f\n", millidiff(start, stop));
+	printf("%f\n", millidiff(start, stop));
 }
