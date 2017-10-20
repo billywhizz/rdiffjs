@@ -1,0 +1,16 @@
+{
+  "name": "rdiffjs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "rdiff.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hummus": "^1.0.83",
+    "memory-streams": "^0.1.2",
+    "rdiff": "0.0.5"
+  }
+}
